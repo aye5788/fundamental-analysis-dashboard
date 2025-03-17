@@ -16,42 +16,55 @@ def get_fundamentals(ticker, limit=10):
         st.error("Error fetching data. Check API key or ticker.")
         return []
 
+# Extract key financial metrics
+def extract_metrics(data):
+    records = []
+    for item in data:
+        financials = item.get("financials", {})
+        balance_sheet = financials.get("balance_sheet", {})
+        income_statement = financials.get("income_statement", {})
+        cash_flow = financials.get("cash_flow_statement", {})
+        
+        records.append({
+            "date": item.get("start_date", ""),
+            "fiscal_period": item.get("fiscal_period", ""),
+            "revenue": income_statement.get("revenue", {}).get("value"),
+            "net_income": income_statement.get("net_income", {}).get("value"),
+            "eps": income_statement.get("eps", {}).get("value"),
+            "total_assets": balance_sheet.get("total_assets", {}).get("value"),
+            "total_liabilities": balance_sheet.get("total_liabilities", {}).get("value"),
+            "cash_from_operations": cash_flow.get("net_cash_flow_from_operations", {}).get("value"),
+        })
+    return pd.DataFrame(records)
+
 # Streamlit UI
 st.set_page_config(page_title="Fundamental Analysis Dashboard", layout="wide")
-
 st.title("📊 Fundamental Analysis Dashboard")
 st.sidebar.header("Enter Stock Ticker")
 
 # User input
 ticker = st.sidebar.text_input("Stock Ticker (e.g., AAPL)", "AAPL").upper()
 
-# Fetch data
+# Fetch and process data
 data = get_fundamentals(ticker)
+df = extract_metrics(data)
 
-if data:
-    # Convert to DataFrame
-    df = pd.DataFrame(data)
-
-    # Show raw financials
-    st.subheader(f"Financial Data for {ticker}")
+if not df.empty:
+    st.subheader(f"Key Financials for {ticker}")
     st.dataframe(df)
 
-    # Select key financial metrics
-    key_metrics = ["calendarDate", "revenue", "netIncome", "eps", "operatingExpenses", "grossProfit"]
+    # Plot Revenue Trend
+    fig = px.line(df, x="date", y="revenue", title=f"📈 {ticker} Revenue Trend", markers=True)
+    st.plotly_chart(fig)
 
-    if not df.empty and all(col in df.columns for col in key_metrics):
-        df_filtered = df[key_metrics].dropna()
+    # Plot Net Income Trend
+    fig = px.line(df, x="date", y="net_income", title=f"💰 {ticker} Net Income Trend", markers=True)
+    st.plotly_chart(fig)
 
-        # Plot revenue trend
-        fig = px.line(df_filtered, x="calendarDate", y="revenue", title="Revenue Trend", markers=True)
-        st.plotly_chart(fig)
-
-        # Plot net income trend
-        fig = px.line(df_filtered, x="calendarDate", y="netIncome", title="Net Income Trend", markers=True)
-        st.plotly_chart(fig)
-
-        # Plot EPS trend
-        fig = px.line(df_filtered, x="calendarDate", y="eps", title="EPS Trend", markers=True)
-        st.plotly_chart(fig)
+    # Plot EPS Trend
+    fig = px.line(df, x="date", y="eps", title=f"📊 {ticker} Earnings Per Share (EPS)", markers=True)
+    st.plotly_chart(fig)
+    
 else:
-    st.warning("No financial data available for this ticker.")
+    st.warning("No useful financial data available for this ticker.")
+
