@@ -10,31 +10,37 @@ API_KEY = "tktev3i3JKQrLqNPTdxf14r_MX_wpcr0"
 def get_fundamentals(ticker, limit=10):
     url = f"https://api.polygon.io/vX/reference/financials?ticker={ticker}&limit={limit}&apiKey={API_KEY}"
     response = requests.get(url)
+
     if response.status_code == 200:
-        return response.json().get("results", [])
+        data = response.json()
+        return data.get("results", [])  # Extract results array safely
     else:
-        st.error("Error fetching data. Check API key or ticker.")
+        st.error(f"Error fetching data: {response.status_code} - {response.text}")
         return []
 
-# Extract key financial metrics
+# Extract key financial metrics safely
 def extract_metrics(data):
     records = []
     for item in data:
         financials = item.get("financials", {})
+
+        # Extract sub-sections safely
         balance_sheet = financials.get("balance_sheet", {})
         income_statement = financials.get("income_statement", {})
         cash_flow = financials.get("cash_flow_statement", {})
-        
+
+        # Extract key metrics, handling missing values properly
         records.append({
             "date": item.get("start_date", ""),
             "fiscal_period": item.get("fiscal_period", ""),
-            "revenue": income_statement.get("revenue", {}).get("value"),
-            "net_income": income_statement.get("net_income", {}).get("value"),
-            "eps": income_statement.get("eps", {}).get("value"),
-            "total_assets": balance_sheet.get("total_assets", {}).get("value"),
-            "total_liabilities": balance_sheet.get("total_liabilities", {}).get("value"),
-            "cash_from_operations": cash_flow.get("net_cash_flow_from_operations", {}).get("value"),
+            "revenue": income_statement.get("revenue", {}).get("value", None),
+            "net_income": income_statement.get("net_income", {}).get("value", None),
+            "eps": income_statement.get("earnings_per_share", {}).get("value", None),  # Corrected EPS key
+            "total_assets": balance_sheet.get("total_assets", {}).get("value", None),
+            "total_liabilities": balance_sheet.get("total_liabilities", {}).get("value", None),
+            "cash_from_operations": cash_flow.get("net_cash_flow_from_operations", {}).get("value", None),
         })
+    
     return pd.DataFrame(records)
 
 # Streamlit UI
@@ -66,5 +72,5 @@ if not df.empty:
     st.plotly_chart(fig)
     
 else:
-    st.warning("No useful financial data available for this ticker.")
+    st.warning("No financial data available for this ticker.")
 
